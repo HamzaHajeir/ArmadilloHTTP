@@ -2,6 +2,9 @@
 
 # ArduinoIDE Asynchronous HTTP client library for ESP8266, ESP32
 
+## Version 0.1.3 11/05/2023
+Ports to H4AsyncTCP
+
 ## Version 0.1.2 2/6/2021
 
 Code tidying re std:: prefixing / namespace issues, API/functionality unchanged

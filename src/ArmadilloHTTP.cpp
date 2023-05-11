@@ -1,10 +1,9 @@
-#include<pmbtools.h>
+#include<H4Tools.h>
 #include<ArmadilloHTTP.h>
 
-ArmadilloHTTP::ArmadilloHTTP(): AardvarkTCP(){ 
-    onTCPdisconnect([=](int8_t e){ _scavenge(); });
-    rx([=](const uint8_t* d,size_t s){ _rx(d,s); });
-}
+// ArmadilloHTTP::ArmadilloHTTP(): _Client(nullptr){ 
+    
+// }
 
 void ArmadilloHTTP::_appendHeaders(std::string* p){ 
     for(auto const& r:requestHeaders) *p+=r.first+": "+r.second+"\r\n";
@@ -21,7 +20,7 @@ void ArmadilloHTTP::_execute(const uint8_t* d,size_t s){
     _response.length=s;
     _userfn(_response);
     _inflight=false;
-    if(_compareHeader("Connection","close"))close();
+    if(_compareHeader("Connection","close")) _destroyClient(true);
 }
 
 size_t ArmadilloHTTP::_getContentLength(){
@@ -56,7 +55,17 @@ void ArmadilloHTTP::_preflight(const uint8_t* d,size_t s){
     else _error(ARMA_ERROR_VERB_PROHIBITED);
 }
 
-void ArmadilloHTTP::_prepare(uint32_t phase,const std::string& verb,const std::string& url,ARMA_FN_HTTP f,const VARK_NVP_MAP& fields){
+void ArmadilloHTTP::_prepare(uint32_t phase,const std::string& verb,const std::string& url,ARMA_FN_HTTP f,const H4AT_NVP_MAP& fields){
+    if (_h4atClient == nullptr)
+    {
+        _h4atClient = new H4AsyncClient();
+        _h4atClient->onDisconnect([=](){ ARMA_PRINT1("onDisconnect\n"); _scavenge(); });
+        _h4atClient->onRX([=](const uint8_t* d,size_t s){ _rx(d,s); });
+        _h4atClient->onError([=](int e, int i){ _error(e,i); return true; });
+        _h4atClient->onConnect([=](){_sendRequest(phase); });
+        _h4atClient->onConnectFail([=](){ _destroyClient(true); });
+        _h4atClient->onDelete([=](){ _h4atClient=nullptr; _inflight = false;});
+    }
     if(_inflight) {
         ARMA_PRINT4("REJECTED: BUSY - %s %s\n",verb.data(),url.data());
         _error(ARMA_ERROR_BUSY);
@@ -66,7 +75,6 @@ void ArmadilloHTTP::_prepare(uint32_t phase,const std::string& verb,const std::s
         _phaseVerb[ARMA_PHASE_EXECUTE]=verb;
         _userfn=f;
         //
-        _parseURL(url);
         if(fields.size()){
            if(requestHeaders.count(contentTypeTag())){
                 std::string type=requestHeaders[contentTypeTag()];
@@ -79,8 +87,7 @@ void ArmadilloHTTP::_prepare(uint32_t phase,const std::string& verb,const std::s
             }
         }
         //     
-        onTCPconnect([=](){_sendRequest(phase); });
-        TCPconnect();
+        _h4atClient->connect(url);
     }
 }
 
@@ -127,8 +134,8 @@ void ArmadilloHTTP::_chunkItUp(uint8_t* pMsg,const uint8_t* d,size_t s){
                     return;
                 }
                 else {
-                    _error(VARK_INPUT_TOO_BIG);
-                    close();
+                    _error(H4AT_INPUT_TOO_BIG, _sigmaChunx);
+                    _destroyClient(true);
                     return;
                 }
             }
@@ -202,6 +209,7 @@ void ArmadilloHTTP::_scavenge(){
 void ArmadilloHTTP::_sendRequest(uint32_t phase){
    _phase=phase;
     std::string req=_phaseVerb[_phase]+" ";
+    auto & _URL = _h4atClient->_URL;
     req.append(_URL.path).append(_URL.query.size() ? std::string("?")+_URL.query:"").append(" HTTP/1.1\r\nHost: ").append(_URL.host).append("\r\n");
     req.append("User-Agent: ArmadilloHTTP/").append(ARDUINO_BOARD).append("/").append(ARMADILLO_VERSION).append("\r\n");
     switch(phase){
@@ -219,5 +227,6 @@ void ArmadilloHTTP::_sendRequest(uint32_t phase){
             _appendHeaders(&req);
             break;
     }
-    txdata((const uint8_t*) req.c_str(),req.size()); // hang on to the string :)
+    if (_h4atClient)
+        _h4atClient->TX((const uint8_t*) req.c_str(),req.size()); // hang on to the string :)
 }
