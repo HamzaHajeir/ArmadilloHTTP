@@ -107,11 +107,10 @@ class ArmadilloHTTP {
                             if(_h4atClient){
                                 if (close)
                                     _h4atClient->close();
-                                _h4atClient->onDelete(nullptr);
                                 delete _h4atClient;
                                 _h4atClient=nullptr;
                             }
-                            _inflight = false;
+                            // _inflight = false; // [ ] Necessary?
                         }
         void            _sendRequest(uint32_t phase);
 //      PHASES

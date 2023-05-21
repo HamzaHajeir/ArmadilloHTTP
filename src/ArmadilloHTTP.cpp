@@ -59,12 +59,11 @@ void ArmadilloHTTP::_prepare(uint32_t phase,const std::string& verb,const std::s
     if (_h4atClient == nullptr)
     {
         _h4atClient = new H4AsyncClient();
-        _h4atClient->onDisconnect([=](){ ARMA_PRINT1("onDisconnect\n"); _scavenge(); });
+        _h4atClient->onDisconnect([=](){ ARMA_PRINT1("onDisconnect\n"); _destroyClient(false); _scavenge(); });
         _h4atClient->onRX([=](const uint8_t* d,size_t s){ _rx(d,s); });
         _h4atClient->onError([=](int e, int i){ _error(e,i); return true; });
         _h4atClient->onConnect([=](){_sendRequest(phase); });
-        _h4atClient->onConnectFail([=](){ _destroyClient(true); });
-        _h4atClient->onDelete([=](){ _h4atClient=nullptr; _inflight = false;});
+        _h4atClient->onConnectFail([=](){ _destroyClient(false); _scavenge(); });
     }
     if(_inflight) {
         ARMA_PRINT4("REJECTED: BUSY - %s %s\n",verb.data(),url.data());
