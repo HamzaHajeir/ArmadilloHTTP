@@ -1,6 +1,10 @@
 #include<H4Tools.h>
 #include<ArmadilloHTTP.h>
 
+#if H4AT_TLS_SESSION
+#include "lwip/apps/altcp_tls_mbedtls_opts.h"
+#endif
+
 // ArmadilloHTTP::ArmadilloHTTP(): _Client(nullptr){ 
     
 // }
@@ -56,14 +60,15 @@ void ArmadilloHTTP::_preflight(const uint8_t* d,size_t s){
 }
 
 void ArmadilloHTTP::_prepare(uint32_t phase,const std::string& verb,const std::string& url,ARMA_FN_HTTP f,const H4AT_NVP_MAP& fields){
+    ARMA_PRINT1("_prepare h4at %p _inflight %d\n", _h4atClient, _inflight);
     if (_h4atClient == nullptr)
     {
         _h4atClient = new H4AsyncClient();
-        _h4atClient->onDisconnect([=](){ ARMA_PRINT1("onDisconnect\n"); _destroyClient(false); _scavenge(); });
+        _h4atClient->onDisconnect([=](){ ARMA_PRINT1("onDisconnect\n"); _destroyClient(); });
         _h4atClient->onRX([=](const uint8_t* d,size_t s){ _rx(d,s); });
-        _h4atClient->onError([=](int e, int i){ _error(e,i); return true; });
+        _h4atClient->onError([=](int e, int i){ _error(e,i); if (e) _destroyClient(); return true; });
         _h4atClient->onConnect([=](){_sendRequest(phase); });
-        _h4atClient->onConnectFail([=](){ _destroyClient(false); _scavenge(); });
+        _h4atClient->onConnectFail([=](){ ARMA_PRINT1("onConnectFail\n"); _destroyClient(); });
     }
     if(_inflight) {
         ARMA_PRINT4("REJECTED: BUSY - %s %s\n",verb.data(),url.data());
@@ -86,6 +91,52 @@ void ArmadilloHTTP::_prepare(uint32_t phase,const std::string& verb,const std::s
             }
         }
         //     
+#if H4AT_TLS_SESSION
+         // [ ] Parse base URL / Host and use it in comparison.
+        static void* _tlsSession;
+        static uint32_t _lastSessionMs;
+        static std::string lastURL;
+        _h4atClient->enableTLSSession();
+        _h4atClient->onSession(
+            [=](void *tls_session)
+            {
+                ARMA_PRINT1("onSession(%p)\n", tls_session);
+                _tlsSession = const_cast<void *>(tls_session);
+                _lastSessionMs = millis();
+                ARMA_PRINT3("_tlsSession %p _lastSessionMs %u\n", _tlsSession, _lastSessionMs);
+            });
+
+
+        // ARMA_PRINT4("url %s lastURL %s millis() %u _lastSessionMs %u diff=%u\n url==lastURL=%d\tdiff<timeout=%d\n", url.c_str(), lastURL.c_str(), millis(), _lastSessionMs, millis() - _lastSessionMs, 
+        // url == lastURL, (millis() - _lastSessionMs < ALTCP_MBEDTLS_SESSION_CACHE_TIMEOUT_SECONDS * 1000));
+        if (_tlsSession && url == lastURL && (millis() - _lastSessionMs < ALTCP_MBEDTLS_SESSION_CACHE_TIMEOUT_SECONDS * 1000)) {
+            _h4atClient->setTLSSession(_tlsSession);
+        }
+        else {
+            if (_tlsSession) {
+                _h4atClient->freeTLSSession(_tlsSession);
+                _tlsSession = nullptr;
+            }
+        }
+        lastURL = url;
+#endif
+
+        auto cas = _caCert.size();
+        auto pks = _privkey.size();
+        auto pkps = _privkeyPass.size();
+        auto cs = _clientCert.size();
+        Serial.printf("cas %d\n", cas);
+        if (cas) {
+#if H4AT_TLS
+            _h4atClient->secureTLS(_caCert.data(), _caCert.size(), 
+                                        pks ? _privkey.data() : nullptr, pks, 
+                                        pkps ? _privkeyPass.data() : nullptr, pkps, 
+                                        cs ? _clientCert.data() : nullptr, cs);
+#else 
+            ARMA_PRINT1("Make sure TLS is enabled in H4AsyncTCP\n");
+#endif 
+        }
+
         _h4atClient->connect(url);
     }
 }
@@ -153,7 +204,7 @@ void ArmadilloHTTP::_rx(const uint8_t* d,size_t s){
         ptrdiff_t szHdrs=(const uint8_t*) i-d;
         if(szHdrs > s) return;
 
-        uint8_t* pMsg=(uint8_t*) (d+szHdrs+4);
+        uint8_t* pMsg=(uint8_t*) (d+szHdrs+4); //pMsg = i+4 ..?
         const size_t   msgLen=s-(szHdrs+4);
         ARMA_PRINT4("Looks like hdrs n=%d msgLen=%d @ 0x%08x\n",szHdrs,msgLen,pMsg);
 
@@ -162,6 +213,11 @@ void ArmadilloHTTP::_rx(const uint8_t* d,size_t s){
 
         std::vector<std::string> hdrs=split(rawheaders,"\r\n");
         std::vector<std::string> status=split(hdrs[0]," ");
+        if (!stringIsNumeric(status[1])) {
+            ARMA_PRINT1("ERROR: NO STATUS CODE\n");
+            _error(ARMA_ERROR_HTTP);
+            return;
+        }
         _response.httpResponseCode=atoi(status[1].c_str());
         ARMA_PRINT4("_response.httpResponseCode=%d\n",_response.httpResponseCode);
             
@@ -202,6 +258,7 @@ void ArmadilloHTTP::_scavenge(){
     for(auto &c:_chunks) c.clear();
     _sigmaChunx=0;
     _inflight=false;
+    _h4atClient=nullptr;
     ARMA_PRINT4("_scavenge() UT FH=%u\n",_HAL_freeHeap());
 }
 
@@ -228,4 +285,33 @@ void ArmadilloHTTP::_sendRequest(uint32_t phase){
     }
     if (_h4atClient)
         _h4atClient->TX((const uint8_t*) req.c_str(),req.size()); // hang on to the string :)
+}
+
+bool ArmadilloHTTP::secureTLS(const u8_t *ca, size_t ca_len, const u8_t *privkey, size_t privkey_len, const u8_t *privkey_pass, size_t privkey_pass_len, const u8_t *cert, size_t cert_len)
+{
+#if H4AT_TLS
+    // Copy to internals 
+    ARMA_PRINT1("secureTLS(%p,%d,%p,%d,%p,%d,%p,%d)\n",ca,ca_len,privkey,privkey_len,privkey_pass,privkey_pass_len,cert,cert_len);
+
+    if (ca) {
+        _caCert.reserve(ca_len);
+        std::copy_n(ca, ca_len, std::back_inserter(_caCert));
+    }
+    if (privkey) {
+        _privkey.reserve(privkey_len);
+        std::copy_n(privkey, privkey_len, std::back_inserter(_privkey));
+    }
+    if (privkey_pass) {
+        _privkeyPass.reserve(privkey_pass_len);
+        std::copy_n(privkey_pass, privkey_pass_len, std::back_inserter(_privkeyPass));
+    }
+    if (cert) {
+        _clientCert.reserve(cert_len);
+        std::copy_n(cert, cert_len, std::back_inserter(_clientCert));
+    }
+    return true;
+#else
+    ARMA_PRINT1("TLS is not activated within H4AsyncTCP\n");
+	return false;
+#endif
 }

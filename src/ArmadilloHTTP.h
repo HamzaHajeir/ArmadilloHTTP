@@ -87,6 +87,12 @@ class ArmadilloHTTP {
         ARMA_HTTP_REPLY _response;
         ARMA_CHUNKS     _chunks;
         ARMA_FN_HTTP    _userfn;
+        std::vector<uint8_t> _caCert;
+        std::vector<uint8_t> _privkey;
+        std::vector<uint8_t> _privkeyPass;
+        std::vector<uint8_t> _clientCert;
+               
+
         void            _appendHeaders(std::string* p);
         void            _chunkItUp(uint8_t* pMsg,const uint8_t* d,size_t s);
         bool            _compareHeader(const std::string& h,const std::string& v);
@@ -110,6 +116,7 @@ class ArmadilloHTTP {
                                 _h4atClient=nullptr;
                             }
                             // _inflight = false; // [ ] Necessary?
+                            _scavenge();
                         }
         void            _sendRequest(uint32_t phase);
 //      PHASES
@@ -136,6 +143,9 @@ class ArmadilloHTTP {
         virtual void    PATCH(const std::string& url,const H4AT_NVP_MAP& fields,ARMA_FN_HTTP rx,const uint8_t* fingerprint=nullptr,uint32_t phase=ARMA_PHASE_EXECUTE){ _prepare(phase,"PATCH",url,rx,fields); }
         virtual void    POST(const std::string& url,const H4AT_NVP_MAP& fields,ARMA_FN_HTTP rx,const uint8_t* fingerprint=nullptr,uint32_t phase=ARMA_PHASE_EXECUTE){ _prepare(phase,"POST",url,rx,fields); }
         virtual void    PUT(const std::string& url,const H4AT_NVP_MAP& fields,ARMA_FN_HTTP rx,const uint8_t* fingerprint=nullptr,uint32_t phase=ARMA_PHASE_EXECUTE){ _prepare(phase,"PUT",url,rx,fields); }
+        bool            secureTLS(const u8_t *ca, size_t ca_len, const u8_t *privkey = nullptr, size_t privkey_len=0,
+                                const u8_t *privkey_pass = nullptr, size_t privkey_pass_len = 0,
+                                const u8_t *cert = nullptr, size_t cert_len = 0);
         // ~ArmadilloHTTP() {
         //     // H4AsyncClient::~H4AsyncClient();
         //     _scavenge();
