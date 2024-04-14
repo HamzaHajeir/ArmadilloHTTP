@@ -64,11 +64,11 @@ void ArmadilloHTTP::_prepare(uint32_t phase,const std::string& verb,const std::s
     if (_h4atClient == nullptr)
     {
         _h4atClient = new H4AsyncClient();
-        _h4atClient->onDisconnect([=](){ ARMA_PRINT1("onDisconnect\n"); _destroyClient(); });
-        _h4atClient->onRX([=](const uint8_t* d,size_t s){ _rx(d,s); });
-        _h4atClient->onError([=](int e, int i){ _error(e,i); if (e) _destroyClient(); return true; });
-        _h4atClient->onConnect([=](){_sendRequest(phase); });
-        _h4atClient->onConnectFail([=](){ ARMA_PRINT1("onConnectFail\n"); _destroyClient(); });
+        _h4atClient->onDisconnect([this](){ ARMA_PRINT1("onDisconnect\n"); _destroyClient(); });
+        _h4atClient->onRX([this](const uint8_t* d,size_t s){ _rx(d,s); });
+        _h4atClient->onError([this](int e, int i){ _error(e,i); if (e) _destroyClient(); return true; });
+        _h4atClient->onConnect([phase, this](){_sendRequest(phase); });
+        _h4atClient->onConnectFail([this](){ ARMA_PRINT1("onConnectFail\n"); _destroyClient(); });
     }
     if(_inflight) {
         ARMA_PRINT4("REJECTED: BUSY - %s %s\n",verb.data(),url.data());
@@ -213,7 +213,7 @@ void ArmadilloHTTP::_rx(const uint8_t* d,size_t s){
 
         std::vector<std::string> hdrs=split(rawheaders,"\r\n");
         std::vector<std::string> status=split(hdrs[0]," ");
-        if (!stringIsNumeric(status[1])) {
+        if (status.size() < 3 || !stringIsNumeric(status[1])) { // Checks against 3 parts of the header to filter out the malformed HTTP responses, as well as encrypted ones...
             ARMA_PRINT1("ERROR: NO STATUS CODE\n");
             _error(ARMA_ERROR_HTTP);
             return;
