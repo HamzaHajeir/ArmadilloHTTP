@@ -3,4 +3,5 @@ SOONEST:
 SOON:
     follow redirects
 MEDIUM-TERM:
+    websockets
 DREAMLAND:

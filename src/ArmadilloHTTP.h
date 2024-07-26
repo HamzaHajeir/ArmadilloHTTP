@@ -70,7 +70,7 @@ using ARMA_CHUNKS       = std::vector<mbx>;
 using ARMA_FN_ERROR     = std::function<void(int,int)>;
 
 class ArmadilloHTTP {
-        H4AsyncClient*      _h4atClient;
+        H4AsyncClient*      _h4atClient=nullptr;
 
         std::string     _bodydata;
         size_t          _sigmaChunx=0;
@@ -78,11 +78,6 @@ class ArmadilloHTTP {
         bool            _inflight=false;
         ARMA_FN_ERROR   _errorfn=nullptr;
         
-        ARMA_INT_MAP _phaseVerb={
-            {ARMA_PHASE_PREFLIGHT,"OPTIONS"},
-            {ARMA_PHASE_MEASURE,"HEAD"},
-            {ARMA_PHASE_EXECUTE,"GET"}
-        };
 
         ARMA_HTTP_REPLY _response;
         ARMA_CHUNKS     _chunks;

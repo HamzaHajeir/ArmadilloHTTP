@@ -9,6 +9,12 @@
     
 // }
 
+ARMA_INT_MAP _phaseVerb={
+    {ARMA_PHASE_PREFLIGHT,"OPTIONS"},
+    {ARMA_PHASE_MEASURE,"HEAD"},
+    {ARMA_PHASE_EXECUTE,"GET"}
+};
+
 void ArmadilloHTTP::_appendHeaders(std::string* p){ 
     for(auto const& r:requestHeaders) *p+=r.first+": "+r.second+"\r\n";
     *p+="\r\n";
@@ -67,7 +73,7 @@ void ArmadilloHTTP::_prepare(uint32_t phase,const std::string& verb,const std::s
         _h4atClient->onDisconnect([this](){ ARMA_PRINT1("onDisconnect\n"); _destroyClient(); });
         _h4atClient->onRX([this](const uint8_t* d,size_t s){ _rx(d,s); });
         _h4atClient->onError([this](int e, int i){ _error(e,i); if (e) _destroyClient(); return true; });
-        _h4atClient->onConnect([phase, this](){_sendRequest(phase); });
+        _h4atClient->onConnect([phase, this](){ h4.queueFunction([phase,this]{ _sendRequest(phase);}); });
         _h4atClient->onConnectFail([this](){ ARMA_PRINT1("onConnectFail\n"); _destroyClient(); });
     }
     if(_inflight) {
@@ -125,7 +131,7 @@ void ArmadilloHTTP::_prepare(uint32_t phase,const std::string& verb,const std::s
         auto pks = _privkey.size();
         auto pkps = _privkeyPass.size();
         auto cs = _clientCert.size();
-        Serial.printf("cas %d\n", cas);
+        ARMA_PRINT2("cas %d\n", cas);
         if (cas) {
 #if H4AT_TLS
             _h4atClient->secureTLS(_caCert.data(), _caCert.size(), 
