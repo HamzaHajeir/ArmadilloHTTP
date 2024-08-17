@@ -1,6 +1,6 @@
 ![vark](assets/armadillo.jpg)
 
-# ArduinoIDE Asynchronous HTTP client library for ESP8266, ESP32
+# Arduino Asynchronous HTTP client library for ESP8266, ESP32, and RP2040
 
 ## Version 0.1.5 08/07/2023
 Adds TLS support over H4AsyncTCP`
@@ -47,7 +47,7 @@ ArmadilloHTTP sits on top of [AardvarkTCP](https://github.com/philbowles/Aardvar
 
 ESP32 and '8266 use LwIP to manage TCP communications. LwIP allows multiple buffers, for ESP8266 it's 2, so what you see in the figures above is 1072=2x536 and 2920=2x1460. The important point here is that *all* of the "magic numbers" 536, 1460 (the individual LwIP buffer size) and 2 (the number of buffers) are implementation-dependent and *could* change in the future, so "hardcoding" any of them into your own app would be a **bad idea** as it could cause problems in the future or prevent your code running on newer / different machines.
 
-If you want code that runs on either ESP32 or ESP8266 with no changes, then you need something that automatically caters for those values and make is so that you can just send and receive without worrying about them.
+If you want code that runs on ESP's or RP2040 with no changes, then you need something that automatically caters for those values and make is so that you can just send and receive without worrying about them.
 
 ArmadilloHTTP solves that problem by allowing data up to aabout half of the free heap to be sent / received, no matter what any of those LwIP "magic numbers" above are. It also provides a very simple interface which seamlessly manages both unencrypted and TLS-encrypted (ESP8266 only) sessions, depending on the URL provided.
 
@@ -131,13 +131,23 @@ ESP8266 targets will happily resolve `.local` names. See "Known Issues" re ESP32
 
 ## Using TLS
 
-TLS is only currently only available on ESP8266 targets. The first step to using TLS is to edit the [`async_config.h`](https://github.com/philbowles/ESPAsyncTCP-master/blob/master/src/async_config.h) file in [Forked AsyncTCP](https://github.com/philbowles/AsyncTCP-master/scr) and change `#define ASYNC_TCP_SSL_ENABLED 0` to `#define ASYNC_TCP_SSL_ENABLED 1`
+TLS is currently available for ESP32 targets only, please refer to [H4AsyncTCP README](https://github.com/hamzahajeir/h4asynctcp) to know how to activate it.
 
-Note that this will significantly increase the size of the compiled app. Unless you absolutely need it, do not compile in TLS!
+Note that you'll need to call `secureTLS(...)` with proper parameters.
 
-Note also that the version of TLS that ships with ESPAsyncTCP is very weak and there are many sites that will refuse to connect as they require stronger ciphers or client certificates etc.
+```cpp
+bool secureTLS(const u8_t *ca, size_t ca_len, const u8_t *privkey = nullptr, size_t privkey_len=0,
+                        const u8_t *privkey_pass = nullptr, size_t privkey_pass_len = 0,
+                        const u8_t *cert = nullptr, size_t cert_len = 0);
+```
 
-![tls](assets/common/tls.jpg)
+Wherein it requires at least the CA certificate through `ca`/`ca_len`.
+
+- Private key: The private key of the client certificate (if available)
+- Private key password that encrypts the Private key (if available)
+- Certificate: The client certificate (if available).
+
+* Note: For the certificates supplied to `secureTLS` in PEM format, the length MUST be `strlen(cert) + 1` / `cert.length() + 1` to cover the NULL terminator. However, this is not required for DER formats.
 
 ## "Pre-flighting" and phases
 
@@ -261,7 +271,16 @@ void PUT(const std::string& url,const VARK_NVP_MAP& fields,ARMA_FN_HTTP rx,const
 
 # Installation
 
-Please see [H4 Installer](https://github.com/philbowles/h4installer)
+## PlatformIO
+
+One can get a homogeneous H4 Stack versions from the [PlatformIO H4Plugins Environment](https://github.com/hamzahajeir/h4plugins_env). One can reuse the environment directly, or copy the parts of interest in the configuration file `platformio.ini` in a new project.
+
+## Arduino IDE
+
+Simply download the zip of this repository and install as an Arduino library: `Sketch/Include Library/Add .ZIP Library...`
+
+Up to come: See [H4 Installer](https://github.com/philbowles/h4installer)
+
 # Issues
 
 ## If you want a *quick* resolution, please follow these rules:
