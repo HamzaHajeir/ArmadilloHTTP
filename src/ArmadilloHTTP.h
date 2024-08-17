@@ -10,10 +10,11 @@ constexpr const char* contentLengthTag() { return "CONTENT-LENGTH"; }
 
 extern void dumphex(const uint8_t*,size_t);
 
+#define _ARMA_PRINTF(...) _H4T_PRINTF(__VA_ARGS__)
 #if ARMA_DEBUG
     template<int I, typename... Args>
     void ARMA_PRINT(const char* fmt, Args... args) {
-        if (ARMA_DEBUG >= I) Serial.printf(std::string(std::string("ARMA:%d: ")+fmt).c_str(),I,args...);
+        if (ARMA_DEBUG >= I) _ARMA_PRINTF(std::string(std::string("ARMA:%d: ")+fmt).c_str(),I,args...);
     }
     #define ARMA_PRINT1(...) ARMA_PRINT<1>(__VA_ARGS__)
     #define ARMA_PRINT2(...) ARMA_PRINT<2>(__VA_ARGS__)
@@ -120,7 +121,7 @@ class ArmadilloHTTP {
         void            _execute(const uint8_t* d,size_t s);
 //
 #if ARMA_DEBUG
-        void            _dumphdrs(H4AT_NVP_MAP* pm){ for(auto const& p:*pm) Serial.printf("%s=%s\n",p.first.c_str(),p.second.c_str()); }
+        void            _dumphdrs(H4AT_NVP_MAP* pm){ for(auto const& p:*pm) _ARMA_PRINTF("%s=%s\n",p.first.c_str(),p.second.c_str()); }
         void            _dumpreq(){ _dumphdrs(&requestHeaders); }
         void            _dumpres(){ _dumphdrs(&_response.responseHeaders); }
 #endif
