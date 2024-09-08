@@ -227,7 +227,7 @@ void ArmadilloHTTP::_rx(const uint8_t* d,size_t s){
         _response.httpResponseCode=atoi(status[1].c_str());
         ARMA_PRINT4("_response.httpResponseCode=%d\n",_response.httpResponseCode);
             
-        for(auto const h:std::vector<std::string>(++hdrs.begin(),hdrs.end())){
+        for(auto const &h:std::vector<std::string>(++hdrs.begin(),hdrs.end())){
             std::vector<std::string> deco2=split(h,": ");
             _response.responseHeaders[uppercase(deco2[0])]=deco2.size() > 1 ? deco2[1]:"";
         }
