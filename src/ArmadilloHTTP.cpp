@@ -156,7 +156,7 @@ void ArmadilloHTTP::_chunkItUp(uint8_t* pMsg,const uint8_t* d,size_t s){
         // if n != 23 , invalid chunk count
         if(n<23){
             ARMA_PRINT4("SF addchunk length %d total now %d in %d chunks\n",s,_sigmaChunx,_chunks.size());
-            uint8_t* frag=2+((_chunks.back().data+_chunks.back().len)-s);
+            uint8_t* frag=2+((_chunks.back().get()+_chunks.back().len)-s);
             memcpy(frag,pMsg,s);
         }
         else {
@@ -178,8 +178,8 @@ void ArmadilloHTTP::_chunkItUp(uint8_t* pMsg,const uint8_t* d,size_t s){
                     uint8_t* r=reassembled;
                     for(auto &c:_chunks){
                         ARMA_PRINT4("UNCHUNKING\n");
-                        dumphex(c.data,c.len);
-                        memcpy(r,c.data,c.len);
+                        dumphex(c.get(),c.len);
+                        memcpy(r,c.get(),c.len);
                         c.clear();
                     }
                     _chunks.clear();
