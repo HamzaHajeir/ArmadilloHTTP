@@ -146,6 +146,7 @@ class ArmadilloHTTP {
 
         void            addRequestHeader(const std::string& hdr,const std::string& value){ requestHeaders[uppercase(hdr)]=value; }
         void            onHTTPerror(ARMA_FN_ERROR callback){ _errorfn = callback; }
+        void            setBody(const std::string& body) { _bodydata = body; } // Overridable by const H4AT_NVP_MAP& fields
         
 
         virtual void    DELETE(const std::string& url,ARMA_FN_HTTP rx,const uint8_t* fingerprint=nullptr,uint32_t phase=ARMA_PHASE_EXECUTE){ _prepare(phase,"DELETE",url,rx,{}); }
